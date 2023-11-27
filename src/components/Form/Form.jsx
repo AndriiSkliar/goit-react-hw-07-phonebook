@@ -30,7 +30,6 @@ export const Form = ({onSubmit} ) => {
     onSubmit({
       name,
       phone,
-      id: nanoid(),
     });
     reset();
   };

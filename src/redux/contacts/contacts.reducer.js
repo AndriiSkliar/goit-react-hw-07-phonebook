@@ -1,17 +1,56 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice, isAnyOf } from "@reduxjs/toolkit";
+import axios from "axios";
 
-const contactsData = [
-  {id: 'id-1', name: 'Maria Barvinok', phone: '+38 097 323 88 70', avatar: 'https://ca.slack-edge.com/T05UVJFGHKR-U05VA3663C3-c19d842afff7-512'},
-  {id: 'id-2', name: 'Dima Mentor', phone: '+38 096 888 88 80', avatar: 'https://ca.slack-edge.com/T05UVJFGHKR-U06070Z0R1B-cb7e1290fd75-512'},
-  {id: 'id-3', name: 'Nataliia Valko', phone: '+38 097 777 88 80', avatar: 'https://ca.slack-edge.com/T05UVJFGHKR-U0609UHLG4S-847bdf508cac-512'},
-  {id: 'id-4', name: 'Sasha Repeta', phone: '+38 097 323 88 80', avatar: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZQUbo4Id6f68u2DnixTMAbe3-iI1KB3b8rz03EMkcxyHxWs_XnnCebwXEx9ORbrICNhk&usqp=CAU'},
-  {id: 'id-5', name: 'Viacheslav Borysov', phone: '+38 096 999 99 90', avatar: 'https://ca.slack-edge.com/T05UVJFGHKR-U06071TEJBX-c06a44ef6d43-512'},
-]
+export const fetchContacts = createAsyncThunk(
+  "contacts/fetchAll",
+  async (_, thunkApi) => {
+    try {
+      const { data } = await axios.get(
+        `https://65638b3eee04015769a75da8.mockapi.io/contacts`
+        );
+      return data;
+    } catch (err) {
+      return thunkApi.rejectWithValue(err.message);
+    }
+  }
+  );
 
-const initialState  = {
-  contacts: JSON.parse(localStorage.getItem("contacts")) ?? contactsData,
-  filter: "",
-}
+export const addContact = createAsyncThunk(
+  "contacts/addContact",
+  async (newContact, thunkApi) => {
+    try {
+      const { data } = await axios.post('https://65638b3eee04015769a75da8.mockapi.io/contacts', newContact,{
+      headers: {'Content-Type': 'application/json',},
+    });
+      return data;
+    } catch (err) {
+      return thunkApi.rejectWithValue(err.message);
+    }
+  }
+);
+
+export const deleteContact = createAsyncThunk(
+  "contacts/deleteContact",
+  async (contactId, thunkApi) => {
+    try {
+      const { data } = await axios.delete(
+        `https://65638b3eee04015769a75da8.mockapi.io/contacts/${contactId}`
+        );
+      return data;
+    } catch (err) {
+      return thunkApi.rejectWithValue(err.message);
+    }
+  }
+  );
+
+  const initialState = {
+    contacts: {
+      items: null,
+      isLoading: false,
+      error: null
+    },
+    filterTerm: "",
+  }
 
 const contactsSlice = createSlice({
 
@@ -20,17 +59,45 @@ const contactsSlice = createSlice({
   initialState,
 
   reducers: {
-    addContact(state, {payload}) {
-      state.contacts.push(payload);
-    },
-    deleteContact(state, {payload}) {
-      state.contacts = state.contacts.filter((contact) => contact.id !== payload);
-    },
     changedFilter(state, {payload}) {
-      state.filter = payload;
+      state.filterTerm = payload;
     },
   },
+
+  extraReducers: builder =>
+    builder
+      .addCase(fetchContacts.fulfilled, (state, { payload }) => {
+        state.contacts.isLoading = false;
+        state.contacts.items = payload;
+      })
+      .addCase(addContact.fulfilled, (state, { payload }) => {
+        state.contacts.isLoading = false;
+        state.contacts.items.push(payload);
+      })
+      .addCase(deleteContact.fulfilled, (state, { payload }) => {
+        state.contacts.isLoading = false;
+        state.contacts.items = state.contacts.items.filter(item => item.id  !== payload.id);
+      })
+
+      .addMatcher(isAnyOf(
+        fetchContacts.pending,
+        addContact.pending,
+        deleteContact.pending
+      ),
+       state => {
+        state.contacts.isLoading = true;
+        state.contacts.error = null;
+      })
+      .addMatcher(isAnyOf(
+        fetchContacts.rejected,
+        addContact.rejected,
+        deleteContact.rejected
+      ),
+       (state, { payload }) => {
+        state.contacts.isLoading = false;
+        state.contacts.error = payload;
+      })
 });
 
-export const { addContact, deleteContact, changedFilter } = contactsSlice.actions;
+export const { changedFilter } = contactsSlice.actions;
 export const contactsReducer = contactsSlice.reducer;
